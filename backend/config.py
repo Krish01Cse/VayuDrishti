@@ -96,8 +96,8 @@ class Settings(BaseSettings):
     VISION_PROVIDER: Literal["bedrock", "openai", "mock"] = Field(default="mock")
 
     # Bedrock
-    BEDROCK_MODEL_ID: str = Field(default="anthropic.claude-haiku-20240307-v1:0")
-    BEDROCK_REGION: str = Field(default="us-east-1")  # may differ from main AWS_REGION
+    BEDROCK_MODEL_ID: str = Field(default="anthropic.claude-3-haiku-20240307-v1:0")
+    BEDROCK_REGION: str = Field(default="ap-south-1")  # e.g. ap-south-1 or us-east-1
 
     # OpenAI (fallback)
     OPENAI_API_KEY: str = Field(default="")
