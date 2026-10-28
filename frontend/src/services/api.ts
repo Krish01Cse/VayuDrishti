@@ -104,3 +104,32 @@ export async function listReports(limit = 20, status?: string): Promise<DustRepo
   }
   return response.json();
 }
+
+/**
+ * Check backend API health and connectivity status.
+ */
+export async function checkApiHealth(detailed = false): Promise<{
+  status: string;
+  version?: string;
+  region?: string;
+  storage_provider?: string;
+  vision_provider?: string;
+}> {
+  try {
+    const res = await fetch(`${API_BASE_URL.replace(/\/api\/v1\/?$/, '')}/health${detailed ? '?detailed=true' : ''}`);
+    if (res.ok) {
+      return await res.json();
+    }
+  } catch {
+    // try fallback route
+  }
+  try {
+    const res2 = await fetch(`${API_BASE_URL}/health${detailed ? '?detailed=true' : ''}`);
+    if (res2.ok) {
+      return await res2.json();
+    }
+  } catch (err) {
+    return { status: 'offline' };
+  }
+  return { status: 'offline' };
+}
