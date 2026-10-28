@@ -75,18 +75,24 @@ def _client():
 # Bucket bootstrap
 # ---------------------------------------------------------------------------
 
+_verified_buckets: set[str] = set()
+
 def _ensure_bucket(bucket: str, region: str, use_localstack: bool) -> None:
     """
-    Create *bucket* if it does not exist.
-
-    On real AWS in us-east-1, ``CreateBucketConfiguration`` must **not** be
-    sent (AWS quirk).  For every other region, or when LocalStack is active,
-    we include it.
-
-    Already-exists errors are silently swallowed; all other ``ClientError``
-    values are re-raised as :class:`S3ServiceError`.
+    Ensure *bucket* exists. Caches verified buckets to avoid redundant API calls.
     """
+    global _verified_buckets
+    if bucket in _verified_buckets:
+        return
+
     client = _client()
+    try:
+        client.head_bucket(Bucket=bucket)
+        _verified_buckets.add(bucket)
+        return
+    except ClientError:
+        pass
+
     _benign = {"BucketAlreadyOwnedByYou", "BucketAlreadyExists"}
 
     kwargs: dict = {"Bucket": bucket}
@@ -95,12 +101,15 @@ def _ensure_bucket(bucket: str, region: str, use_localstack: bool) -> None:
 
     try:
         client.create_bucket(**kwargs)
+        _verified_buckets.add(bucket)
         logger.info("s3_service: created bucket '%s'", bucket)
     except ClientError as exc:
         code = exc.response.get("Error", {}).get("Code", "")
-        if code not in _benign:
-            raise S3ServiceError(f"Failed to create bucket '{bucket}': {exc}") from exc
-        logger.debug("s3_service: bucket '%s' already exists — continuing", bucket)
+        if code in _benign:
+            _verified_buckets.add(bucket)
+            logger.debug("s3_service: bucket '%s' already exists — continuing", bucket)
+        else:
+            raise S3ServiceError(f"Failed to access or create bucket '{bucket}': {exc}") from exc
 
 
 # ---------------------------------------------------------------------------

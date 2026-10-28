@@ -6,9 +6,9 @@
     "dev:frontend": "npm run dev --prefix frontend",
     "build:frontend": "npm run build --prefix frontend",
     "lint:frontend": "npm run lint --prefix frontend",
-    "verify:aws": "python3 infrastructure/verify_aws.py",
-    "setup:tables": "python3 infrastructure/create_tables.py",
-    "setup:s3": "python3 infrastructure/setup_s3_bucket.py",
+    "verify:aws": "backend/venv/bin/python3 infrastructure/verify_aws.py",
+    "setup:tables": "backend/venv/bin/python3 infrastructure/create_tables.py",
+    "setup:s3": "backend/venv/bin/python3 infrastructure/setup_s3_bucket.py",
     "backend:start": "./start_backend.sh"
   },
   "keywords": [

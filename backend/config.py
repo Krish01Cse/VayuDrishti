@@ -17,10 +17,21 @@ import ast
 import json
 import os
 from functools import lru_cache
+from pathlib import Path
 from typing import Any, Literal, Optional
 
+from dotenv import load_dotenv
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings
+
+# Explicitly load .env into os.environ so all libraries (boto3, pydantic) pick up AWS credentials
+_env_locations = [
+    Path(__file__).resolve().parent / ".env",
+    Path(__file__).resolve().parent.parent / ".env",
+]
+for _env_path in _env_locations:
+    if _env_path.exists():
+        load_dotenv(dotenv_path=_env_path, override=True)
 
 
 # ---------------------------------------------------------------------------
