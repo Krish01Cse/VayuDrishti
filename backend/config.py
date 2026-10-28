@@ -60,11 +60,14 @@ class Settings(BaseSettings):
 
     # ------------------------------------------------------------------
     # AWS credentials / region
-    # For LocalStack, dummy values are fine ("test" / "test").
+    # When deployed on AWS (App Runner, ECS, Lambda, EC2), leave keys empty
+    # so boto3 automatically uses the IAM execution role / instance profile.
+    # For LocalStack, dummy values ("test") will be used automatically.
     # ------------------------------------------------------------------
-    AWS_REGION: str = Field(default="us-east-1")
-    AWS_ACCESS_KEY_ID: str = Field(default="test")
-    AWS_SECRET_ACCESS_KEY: str = Field(default="test")
+    AWS_REGION: str = Field(default="ap-south-1")
+    AWS_ACCESS_KEY_ID: Optional[str] = Field(default=None)
+    AWS_SECRET_ACCESS_KEY: Optional[str] = Field(default=None)
+    AWS_SESSION_TOKEN: Optional[str] = Field(default=None)
 
     # ------------------------------------------------------------------
     # S3
@@ -149,14 +152,24 @@ class Settings(BaseSettings):
         """
         Common kwargs to pass to every boto3.client() / boto3.resource() call.
         Includes endpoint_url only when LocalStack is active.
+        Omits explicit access keys when not set so boto3 uses standard AWS IAM
+        credential provider chains in AWS Console (App Runner, ECS, Lambda, EC2).
         """
         kwargs: dict = {
             "region_name": self.AWS_REGION,
-            "aws_access_key_id": self.AWS_ACCESS_KEY_ID,
-            "aws_secret_access_key": self.AWS_SECRET_ACCESS_KEY,
         }
         if self.USE_LOCALSTACK:
             kwargs["endpoint_url"] = self.LOCALSTACK_ENDPOINT
+            kwargs["aws_access_key_id"] = self.AWS_ACCESS_KEY_ID or "test"
+            kwargs["aws_secret_access_key"] = self.AWS_SECRET_ACCESS_KEY or "test"
+        else:
+            if self.AWS_ACCESS_KEY_ID and self.AWS_ACCESS_KEY_ID.strip():
+                kwargs["aws_access_key_id"] = self.AWS_ACCESS_KEY_ID.strip()
+            if self.AWS_SECRET_ACCESS_KEY and self.AWS_SECRET_ACCESS_KEY.strip():
+                kwargs["aws_secret_access_key"] = self.AWS_SECRET_ACCESS_KEY.strip()
+            if self.AWS_SESSION_TOKEN and self.AWS_SESSION_TOKEN.strip():
+                kwargs["aws_session_token"] = self.AWS_SESSION_TOKEN.strip()
+
         return kwargs
 
     class Config:
