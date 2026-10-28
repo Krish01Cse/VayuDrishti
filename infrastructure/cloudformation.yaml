@@ -1,0 +1,258 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  VayuDrishti CloudFormation Template — Provisions S3 Bucket with CORS,
+  DynamoDB Tables (DustReports, IncidentCases, ReviewDecisions, AuditEvents),
+  and IAM execution roles for AWS Console deployment.
+
+Parameters:
+  ProjectName:
+    Type: String
+    Default: VayuDrishti
+    Description: Project tag name
+  Environment:
+    Type: String
+    Default: production
+    AllowedValues: [production, staging, dev]
+    Description: Deployment environment
+  S3BucketName:
+    Type: String
+    Default: vayudrishti-images
+    Description: Globally unique S3 bucket name for resident pollution report images
+
+Resources:
+  # ---------------------------------------------------------------------------
+  # 1. S3 Storage for Resident Photos with CORS
+  # ---------------------------------------------------------------------------
+  ReportsImageBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Ref S3BucketName
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      CorsConfiguration:
+        CorsRules:
+          - AllowedHeaders: ['*']
+            AllowedMethods: [GET, PUT, HEAD]
+            AllowedOrigins: ['*']
+            ExposeHeaders: [ETag, x-amz-request-id]
+            MaxAge: 3600
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Environment
+          Value: !Ref Environment
+
+  # ---------------------------------------------------------------------------
+  # 2. DynamoDB Tables
+  # ---------------------------------------------------------------------------
+  DustReportsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: DustReports
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: report_id
+          AttributeType: S
+        - AttributeName: case_id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: report_id
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: case_id-index
+          KeySchema:
+            - AttributeName: case_id
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Environment
+          Value: !Ref Environment
+
+  IncidentCasesTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: IncidentCases
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: case_id
+          AttributeType: S
+        - AttributeName: status
+          AttributeType: S
+        - AttributeName: updated_at
+          AttributeType: S
+      KeySchema:
+        - AttributeName: case_id
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: status-updated_at-index
+          KeySchema:
+            - AttributeName: status
+              KeyType: HASH
+            - AttributeName: updated_at
+              KeyType: RANGE
+          Projection:
+            ProjectionType: INCLUDE
+            NonKeyAttributes:
+              - case_id
+              - priority_score
+              - latitude
+              - longitude
+              - first_reported_at
+              - last_reported_at
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Environment
+          Value: !Ref Environment
+
+  ReviewDecisionsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: ReviewDecisions
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: decision_id
+          AttributeType: S
+        - AttributeName: case_id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: decision_id
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: case_id-index
+          KeySchema:
+            - AttributeName: case_id
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Environment
+          Value: !Ref Environment
+
+  AuditEventsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: AuditEvents
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: event_id
+          AttributeType: S
+        - AttributeName: timestamp
+          AttributeType: S
+        - AttributeName: case_id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: event_id
+          KeyType: HASH
+        - AttributeName: timestamp
+          KeyType: RANGE
+      GlobalSecondaryIndexes:
+        - IndexName: case_id-timestamp-index
+          KeySchema:
+            - AttributeName: case_id
+              KeyType: HASH
+            - AttributeName: timestamp
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Environment
+          Value: !Ref Environment
+
+  # ---------------------------------------------------------------------------
+  # 3. IAM Execution Role for Backend (App Runner / ECS / Lambda / EC2)
+  # ---------------------------------------------------------------------------
+  BackendExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub '${ProjectName}-BackendRole-${AWS::Region}'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - build.apprunner.amazonaws.com
+                - tasks.apprunner.amazonaws.com
+                - ecs-tasks.amazonaws.com
+                - lambda.amazonaws.com
+                - ec2.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: VayuDrishtiBackendPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              # S3 Access
+              - Effect: Allow
+                Action:
+                  - s3:PutObject
+                  - s3:GetObject
+                  - s3:DeleteObject
+                  - s3:ListBucket
+                Resource:
+                  - !Sub 'arn:aws:s3:::${S3BucketName}'
+                  - !Sub 'arn:aws:s3:::${S3BucketName}/*'
+              # DynamoDB Access
+              - Effect: Allow
+                Action:
+                  - dynamodb:PutItem
+                  - dynamodb:GetItem
+                  - dynamodb:UpdateItem
+                  - dynamodb:DeleteItem
+                  - dynamodb:Query
+                  - dynamodb:Scan
+                  - dynamodb:DescribeTable
+                Resource:
+                  - !GetAtt DustReportsTable.Arn
+                  - !Sub '${DustReportsTable.Arn}/index/*'
+                  - !GetAtt IncidentCasesTable.Arn
+                  - !Sub '${IncidentCasesTable.Arn}/index/*'
+                  - !GetAtt ReviewDecisionsTable.Arn
+                  - !Sub '${ReviewDecisionsTable.Arn}/index/*'
+                  - !GetAtt AuditEventsTable.Arn
+                  - !Sub '${AuditEventsTable.Arn}/index/*'
+              # Amazon Bedrock Claude Vision Access
+              - Effect: Allow
+                Action:
+                  - bedrock:InvokeModel
+                  - bedrock:GetFoundationModel
+                Resource: '*'
+              # CloudWatch Logs
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: 'arn:aws:logs:*:*:*'
+
+Outputs:
+  S3Bucket:
+    Description: S3 Bucket for reports
+    Value: !Ref ReportsImageBucket
+    Export:
+      Name: !Sub '${AWS::StackName}-S3Bucket'
+
+  DustReportsTableName:
+    Description: DynamoDB DustReports Table Name
+    Value: !Ref DustReportsTable
+
+  IncidentCasesTableName:
+    Description: DynamoDB IncidentCases Table Name
+    Value: !Ref IncidentCasesTable
+
+  BackendExecutionRoleArn:
+    Description: IAM Execution Role ARN for backend services
+    Value: !GetAtt BackendExecutionRole.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-BackendExecutionRoleArn'
