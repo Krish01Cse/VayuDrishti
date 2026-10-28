@@ -103,6 +103,8 @@ class DustReportCreate(BaseModel):
     address:     Optional[str] = Field(None, max_length=500)
     description: Optional[str] = Field(None, max_length=2000,
                                         description="Resident's own description of the issue")
+    category:    Optional[str] = Field(None, max_length=100,
+                                        description="Resident-selected source category")
 
     @field_validator("description", mode="before")
     @classmethod

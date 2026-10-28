@@ -125,6 +125,9 @@ async def submit_report(
     description: Optional[str] = Form(
         None, max_length=2000, description="Resident's own description of the issue"
     ),
+    category: Optional[str] = Form(
+        None, max_length=100, description="Resident-selected pollution category"
+    ),
 ) -> DustReportResponse:
     """Submit a dust-pollution report with an image."""
     settings = get_settings()
@@ -135,6 +138,7 @@ async def submit_report(
         longitude=longitude,
         address=address,
         description=description,
+        category=category,
     )
 
     # 2. Read image bytes
