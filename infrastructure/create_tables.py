@@ -332,6 +332,11 @@ def parse_args() -> argparse.Namespace:
         epilog=__doc__,
     )
     parser.add_argument(
+        "--region",
+        default=os.getenv("AWS_REGION", "ap-south-1"),
+        help="AWS region (default: ap-south-1 or from env)",
+    )
+    parser.add_argument(
         "--dry-run",
         action="store_true",
         help="Print what would be created without making any changes.",
@@ -341,13 +346,22 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="DELETE existing tables before recreating them. WARNING: destroys all data.",
     )
+    parser.add_argument(
+        "-y",
+        "--yes",
+        action="store_true",
+        help="Automatic yes to prompts (for automated deployment scripts).",
+    )
     return parser.parse_args()
 
 
 if __name__ == "__main__":
     args = parse_args()
 
-    if args.recreate and not args.dry_run:
+    if args.region:
+        AWS_REGION = args.region
+
+    if args.recreate and not args.dry_run and not args.yes:
         confirm = input(
             "\n[WARNING] --recreate will DELETE all existing VayuDrishti tables and their data.\n"
             "   Type 'yes' to continue: "
