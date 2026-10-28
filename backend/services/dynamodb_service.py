@@ -165,11 +165,27 @@ def get_bounding_box(
 
 def _is_mock() -> bool:
     """Return True when STORAGE_PROVIDER=mock."""
-    return getattr(get_settings(), "STORAGE_PROVIDER", "mock").lower() == "mock"
+    return getattr(get_settings(), "STORAGE_PROVIDER", "aws").lower() == "mock"
 
 
 # In-memory store: report_id -> DustReport
 _MOCK_REPORTS: dict[str, "DustReport"] = {}
+
+
+def _attach_fresh_image_url(report: Optional["DustReport"]) -> Optional["DustReport"]:
+    """Ensure report has a fresh, valid presigned URL when fetched from DynamoDB."""
+    if report is None:
+        return None
+    if not _is_mock() and report.s3_key:
+        try:
+            try:
+                from services.s3_service import generate_signed_url
+            except ImportError:
+                from backend.services.s3_service import generate_signed_url
+            report.image_url = generate_signed_url(report.s3_key, bucket=report.s3_bucket)
+        except Exception as exc:
+            logger.warning("dynamodb_service: failed to refresh presigned URL for '%s': %s", report.report_id, exc)
+    return report
 
 
 # ---------------------------------------------------------------------------
@@ -254,7 +270,7 @@ def get_report(report_id: str) -> Optional[DustReport]:
         if not item:
             logger.debug("dynamodb_service: report '%s' not found", report_id)
             return None
-        return DustReport.from_dynamo_item(item)
+        return _attach_fresh_image_url(DustReport.from_dynamo_item(item))
     except (ClientError, BotoCoreError) as exc:
         raise DynamoDBServiceError(
             f"Failed to get report '{report_id}': {exc}"
@@ -568,7 +584,7 @@ def list_reports(
             start_key = resp.get("LastEvaluatedKey")
             done = start_key is None or len(items) >= limit
 
-        reports = [DustReport.from_dynamo_item(it) for it in items[:limit]]
+        reports = [_attach_fresh_image_url(DustReport.from_dynamo_item(it)) for it in items[:limit]]
         reports.sort(key=lambda r: r.created_at, reverse=True)
         return reports
     except (ClientError, BotoCoreError) as exc:
@@ -586,7 +602,7 @@ def get_reports_by_case(case_id: str) -> list[DustReport]:
             KeyConditionExpression=Key("case_id").eq(case_id),
         )
         items = resp.get("Items", [])
-        reports = [DustReport.from_dynamo_item(it) for it in items]
+        reports = [_attach_fresh_image_url(DustReport.from_dynamo_item(it)) for it in items]
         reports.sort(key=lambda r: r.created_at, reverse=False)
         return reports
     except (ClientError, BotoCoreError) as exc:
@@ -709,7 +725,7 @@ def find_nearby_reports(
 
         # Sort nearest first
         candidates.sort(key=lambda pair: pair[1])
-        return [pair[0] for pair in candidates[:limit]]
+        return [_attach_fresh_image_url(pair[0]) for pair in candidates[:limit]]
 
     except (ClientError, BotoCoreError) as exc:
         raise DynamoDBServiceError(f"Failed to find nearby reports: {exc}") from exc
