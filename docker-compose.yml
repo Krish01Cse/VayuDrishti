@@ -1,0 +1,55 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: vayudrishti-backend
+    ports:
+      - "8000:8000"
+    environment:
+      - APP_NAME=VayuDrishti
+      - APP_VERSION=0.1.0
+      - AWS_REGION=ap-south-1
+      - STORAGE_PROVIDER=aws
+      - VISION_PROVIDER=mock
+      - S3_BUCKET_NAME=vayudrishti-images
+      - DYNAMODB_TABLE_DUST_REPORTS=DustReports
+      - DYNAMODB_TABLE_INCIDENT_CASES=IncidentCases
+      - DYNAMODB_TABLE_REVIEW_DECISIONS=ReviewDecisions
+      - DYNAMODB_TABLE_AUDIT_EVENTS=AuditEvents
+      - CORS_ORIGINS=["http://localhost:5173","http://localhost:3000","http://127.0.0.1:5173"]
+    env_file:
+      - path: ./backend/.env
+        required: false
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: vayudrishti-frontend
+    ports:
+      - "3000:80"
+    environment:
+      - VITE_API_BASE_URL=http://localhost:8000/api/v1
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+  localstack:
+    image: localstack/localstack:latest
+    container_name: vayudrishti-localstack
+    ports:
+      - "4566:4566"
+    environment:
+      - SERVICES=s3,dynamodb
+      - AWS_DEFAULT_REGION=ap-south-1
+    profiles:
+      - local-emulation
