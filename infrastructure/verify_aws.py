@@ -31,6 +31,30 @@ BOLD = "\033[1m"
 RESET = "\033[0m"
 
 
+def load_env_file():
+    """Load key-value pairs from .env or backend/.env into os.environ if not already set."""
+    candidates = [
+        os.path.join(os.path.dirname(__file__), "..", "backend", ".env"),
+        os.path.join(os.path.dirname(__file__), "..", ".env"),
+        ".env",
+        "backend/.env",
+    ]
+    for path in candidates:
+        if os.path.isfile(path):
+            with open(path, "r", encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if line and not line.startswith("#") and "=" in line:
+                        k, v = line.split("=", 1)
+                        k, v = k.strip(), v.strip().strip("'\"")
+                        if k and k not in os.environ:
+                            os.environ[k] = v
+            break
+
+
+load_env_file()
+
+
 def print_status(item: str, status: bool, detail: str = ""):
     icon = f"{GREEN}✔ PASS{RESET}" if status else f"{RED}✗ FAIL{RESET}"
     detail_str = f" — {detail}" if detail else ""

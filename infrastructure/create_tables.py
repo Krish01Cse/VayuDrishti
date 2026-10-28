@@ -32,7 +32,27 @@ from botocore.exceptions import ClientError
 
 # ---------------------------------------------------------------------------
 # Configuration
-# ---------------------------------------------------------------------------
+def load_env_file():
+    candidates = [
+        os.path.join(os.path.dirname(__file__), "..", "backend", ".env"),
+        os.path.join(os.path.dirname(__file__), "..", ".env"),
+        ".env",
+        "backend/.env",
+    ]
+    for path in candidates:
+        if os.path.isfile(path):
+            with open(path, "r", encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if line and not line.startswith("#") and "=" in line:
+                        k, v = line.split("=", 1)
+                        k, v = k.strip(), v.strip().strip("'\"")
+                        if k and k not in os.environ:
+                            os.environ[k] = v
+            break
+
+
+load_env_file()
 
 AWS_REGION = os.getenv("AWS_REGION", "ap-south-1")
 USE_LOCALSTACK = os.getenv("USE_LOCALSTACK", "false").lower() == "true"
