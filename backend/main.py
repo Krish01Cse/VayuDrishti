@@ -144,19 +144,52 @@ def root_redirect() -> RedirectResponse:
 # Health check
 # ---------------------------------------------------------------------------
 
-@app.get("/health", tags=["meta"], summary="Liveness probe")
-def health_check() -> dict:
-    """Simple liveness probe — returns app name, version, and active config."""
-    return {
+@app.get("/health", tags=["meta"], summary="Liveness & Readiness probe")
+@app.get("/api/v1/health", tags=["meta"], summary="API v1 Health & Readiness probe")
+def health_check(detailed: bool = False) -> dict:
+    """
+    Health & Readiness probe for AWS App Runner, ECS, ALB, and CloudWatch.
+    When detailed=true, performs lightweight connectivity checks against S3 and DynamoDB.
+    """
+    health_data: dict = {
         "status": "ok",
         "app": settings.APP_NAME,
         "version": settings.APP_VERSION,
-        "vision_provider": settings.VISION_PROVIDER,
+        "region": settings.AWS_REGION,
         "storage_provider": settings.STORAGE_PROVIDER,
+        "vision_provider": settings.VISION_PROVIDER,
         "use_localstack": settings.USE_LOCALSTACK,
         "s3_bucket": settings.S3_BUCKET_NAME,
         "dynamodb_table": settings.DYNAMODB_TABLE_DUST_REPORTS,
     }
+
+    if detailed:
+        checks: dict[str, str] = {}
+        if settings.STORAGE_PROVIDER == "mock":
+            checks["s3"] = "mock_active"
+            checks["dynamodb"] = "mock_active"
+        else:
+            # Check S3
+            try:
+                from services.s3_service import _client as get_s3
+                get_s3().head_bucket(Bucket=settings.S3_BUCKET_NAME)
+                checks["s3"] = "connected"
+            except Exception as e:
+                checks["s3"] = f"unreachable ({e.__class__.__name__})"
+
+            # Check DynamoDB
+            try:
+                from services.dynamodb_service import _client as get_dynamo
+                get_dynamo().describe_table(TableName=settings.DYNAMODB_TABLE_DUST_REPORTS)
+                checks["dynamodb"] = "connected"
+            except Exception as e:
+                checks["dynamodb"] = f"unreachable ({e.__class__.__name__})"
+
+        health_data["checks"] = checks
+        if any("unreachable" in v for v in checks.values()):
+            health_data["status"] = "degraded"
+
+    return health_data
 
 # ---------------------------------------------------------------------------
 # AWS Lambda entry point (for AWS Console Lambda / SAM deployments)
