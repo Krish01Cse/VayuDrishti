@@ -152,7 +152,19 @@ def health_check() -> dict:
         "app": settings.APP_NAME,
         "version": settings.APP_VERSION,
         "vision_provider": settings.VISION_PROVIDER,
+        "storage_provider": settings.STORAGE_PROVIDER,
         "use_localstack": settings.USE_LOCALSTACK,
         "s3_bucket": settings.S3_BUCKET_NAME,
         "dynamodb_table": settings.DYNAMODB_TABLE_DUST_REPORTS,
     }
+
+# ---------------------------------------------------------------------------
+# AWS Lambda entry point (for AWS Console Lambda / SAM deployments)
+# ---------------------------------------------------------------------------
+try:
+    from mangum import Mangum
+
+    # lifespan="off" is recommended for AWS Lambda serverless execution
+    handler = Mangum(app, lifespan="off")
+except ImportError:
+    handler = None  # Non-lambda environments do not require mangum
