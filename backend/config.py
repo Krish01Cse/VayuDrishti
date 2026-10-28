@@ -70,6 +70,12 @@ class Settings(BaseSettings):
     AWS_SESSION_TOKEN: Optional[str] = Field(default=None)
 
     # ------------------------------------------------------------------
+    # Storage & Database provider
+    # Options: "aws" (uses real S3 & DynamoDB or LocalStack) | "mock" (in-memory)
+    # ------------------------------------------------------------------
+    STORAGE_PROVIDER: Literal["aws", "mock"] = Field(default="aws")
+
+    # ------------------------------------------------------------------
     # S3
     # ------------------------------------------------------------------
     S3_BUCKET_NAME: str = Field(default="vayu-drishti-reports")
@@ -119,6 +125,16 @@ class Settings(BaseSettings):
     # ------------------------------------------------------------------
     # Validators
     # ------------------------------------------------------------------
+    @field_validator("STORAGE_PROVIDER", mode="before")
+    @classmethod
+    def normalise_storage_provider(cls, v: str) -> str:
+        normalised = str(v).strip().lower()
+        if normalised in {"s3", "dynamodb", "aws", "cloud", "production"}:
+            return "aws"
+        if normalised in {"mock", "memory", "in-memory", "local_mock"}:
+            return "mock"
+        return "aws"
+
     @field_validator("VISION_PROVIDER", mode="before")
     @classmethod
     def normalise_vision_provider(cls, v: str) -> str:
