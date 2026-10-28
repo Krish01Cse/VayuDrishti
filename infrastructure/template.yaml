@@ -1,0 +1,90 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  VayuDrishti Serverless Backend — FastAPI on AWS Lambda + API Gateway HTTP API,
+  S3 Bucket, and DynamoDB Tables.
+
+Globals:
+  Function:
+    Timeout: 30
+    MemorySize: 1024
+    Runtime: python3.11
+    Environment:
+      Variables:
+        AWS_REGION: !Ref 'AWS::Region'
+        STORAGE_PROVIDER: aws
+        VISION_PROVIDER: bedrock
+        S3_BUCKET_NAME: !Ref S3BucketName
+        BEDROCK_MODEL_ID: anthropic.claude-3-haiku-20240307-v1:0
+        DYNAMODB_TABLE_DUST_REPORTS: DustReports
+        DYNAMODB_TABLE_INCIDENT_CASES: IncidentCases
+        DYNAMODB_TABLE_REVIEW_DECISIONS: ReviewDecisions
+        DYNAMODB_TABLE_AUDIT_EVENTS: AuditEvents
+
+Parameters:
+  S3BucketName:
+    Type: String
+    Default: vayudrishti-images
+    Description: S3 bucket name for resident images
+
+Resources:
+  # ---------------------------------------------------------------------------
+  # API Gateway HTTP API
+  # ---------------------------------------------------------------------------
+  HttpApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      CorsConfiguration:
+        AllowOrigins:
+          - '*'
+        AllowHeaders:
+          - '*'
+        AllowMethods:
+          - GET
+          - POST
+          - PUT
+          - DELETE
+          - OPTIONS
+
+  # ---------------------------------------------------------------------------
+  # FastAPI Lambda Function
+  # ---------------------------------------------------------------------------
+  FastApiFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ../backend/
+      Handler: main.handler
+      Policies:
+        - S3CrudPolicy:
+            BucketName: !Ref S3BucketName
+        - DynamoDBCrudPolicy:
+            TableName: DustReports
+        - DynamoDBCrudPolicy:
+            TableName: IncidentCases
+        - DynamoDBCrudPolicy:
+            TableName: ReviewDecisions
+        - DynamoDBCrudPolicy:
+            TableName: AuditEvents
+        - Statement:
+            - Effect: Allow
+              Action:
+                - bedrock:InvokeModel
+              Resource: '*'
+      Events:
+        RootEvent:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: /{proxy+}
+            Method: ANY
+        HealthEvent:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: /health
+            Method: GET
+
+Outputs:
+  ApiUrl:
+    Description: Base URL of the API Gateway HTTP API
+    Value: !Sub 'https://${HttpApi}.execute-api.${AWS::Region}.amazonaws.com'
