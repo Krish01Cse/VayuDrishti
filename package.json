@@ -1,0 +1,25 @@
+{
+  "name": "vayudrishti",
+  "version": "0.1.0",
+  "description": "VayuDrishti — Urban Dust Pollution Reporting and Investigation System",
+  "scripts": {
+    "dev:frontend": "npm run dev --prefix frontend",
+    "build:frontend": "npm run build --prefix frontend",
+    "lint:frontend": "npm run lint --prefix frontend",
+    "verify:aws": "python3 infrastructure/verify_aws.py",
+    "setup:tables": "python3 infrastructure/create_tables.py",
+    "setup:s3": "python3 infrastructure/setup_s3_bucket.py",
+    "backend:start": "./start_backend.sh"
+  },
+  "keywords": [
+    "pollution",
+    "air-quality",
+    "aws",
+    "bedrock",
+    "fastapi",
+    "react",
+    "leaflet"
+  ],
+  "author": "VayuDrishti",
+  "license": "MIT"
+}
