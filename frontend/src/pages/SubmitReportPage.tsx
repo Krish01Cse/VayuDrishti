@@ -17,7 +17,8 @@ import {
 } from 'lucide-react';
 import { MapPicker } from '../components/MapPicker';
 import { submitReport, ApiError } from '../services/api';
-import type { DustCategory, DustReportResponse, SubmitReportFormData } from '../types/report';
+import type { DustCategory } from '../types/report';
+import { useReportForm } from '../context/ReportFormContext';
 
 const CATEGORY_OPTIONS: {
   value: DustCategory;
@@ -52,20 +53,20 @@ const CATEGORY_OPTIONS: {
 ];
 
 export const SubmitReportPage: React.FC = () => {
-  const [formData, setFormData] = useState<SubmitReportFormData>({
-    image: null,
-    latitude: 28.6139,
-    longitude: 77.2090,
-    address: '',
-    description: '',
-    category: 'construction',
-  });
+  const {
+    formData,
+    setFormData,
+    imagePreviewUrl,
+    setImageFile,
+    setImagePreviewUrl,
+    submittedReport,
+    setSubmittedReport,
+    resetDraft,
+  } = useReportForm();
 
-  const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [submittedReport, setSubmittedReport] = useState<DustReportResponse | null>(null);
   const [copiedId, setCopiedId] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -79,7 +80,7 @@ export const SubmitReportPage: React.FC = () => {
       return;
     }
 
-    setFormData((prev) => ({ ...prev, image: file }));
+    setImageFile(file);
     setErrorMessage(null);
 
     const reader = new FileReader();
@@ -99,7 +100,7 @@ export const SubmitReportPage: React.FC = () => {
 
   const handleRemoveImage = (e: React.MouseEvent) => {
     e.stopPropagation();
-    setFormData((prev) => ({ ...prev, image: null }));
+    setImageFile(null);
     setImagePreviewUrl(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
@@ -159,16 +160,7 @@ export const SubmitReportPage: React.FC = () => {
   };
 
   const handleResetForm = () => {
-    setSubmittedReport(null);
-    setFormData({
-      image: null,
-      latitude: 28.6139,
-      longitude: 77.2090,
-      address: '',
-      description: '',
-      category: 'construction',
-    });
-    setImagePreviewUrl(null);
+    resetDraft();
     setErrorMessage(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';

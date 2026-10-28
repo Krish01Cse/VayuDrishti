@@ -235,7 +235,15 @@ def create_report(report: DustReport) -> DustReport:
         table.put_item(Item=item)
         logger.info("dynamodb_service: created report '%s'", report.report_id)
         return report
-    except (ClientError, BotoCoreError) as exc:
+    except Exception as exc:
+        err_msg = str(exc).lower()
+        if "could not connect" in err_msg or "endpointconnectionerror" in err_msg or "unable to locate credentials" in err_msg or "nocredentialserror" in err_msg:
+            logger.warning(
+                "dynamodb_service: AWS endpoint or credentials unavailable (%s). Gracefully storing in memory store.",
+                exc,
+            )
+            _MOCK_REPORTS[report.report_id] = report
+            return report
         raise DynamoDBServiceError(
             f"Failed to create report '{report.report_id}': {exc}"
         ) from exc
@@ -269,9 +277,12 @@ def get_report(report_id: str) -> Optional[DustReport]:
         item = resp.get("Item")
         if not item:
             logger.debug("dynamodb_service: report '%s' not found", report_id)
-            return None
+            return _MOCK_REPORTS.get(report_id)
         return _attach_fresh_image_url(DustReport.from_dynamo_item(item))
-    except (ClientError, BotoCoreError) as exc:
+    except Exception as exc:
+        err_msg = str(exc).lower()
+        if "could not connect" in err_msg or "endpointconnectionerror" in err_msg or "unable to locate credentials" in err_msg or "nocredentialserror" in err_msg:
+            return _MOCK_REPORTS.get(report_id)
         raise DynamoDBServiceError(
             f"Failed to get report '{report_id}': {exc}"
         ) from exc
@@ -418,14 +429,20 @@ def update_report_analysis(
             score,
         )
         return DustReport.from_dynamo_item(response["Attributes"])
-    except ClientError as exc:
-        code = exc.response.get("Error", {}).get("Code", "")
-        if code == "ConditionalCheckFailedException":
+    except Exception as exc:
+        err_msg = str(exc).lower()
+        if "could not connect" in err_msg or "endpointconnectionerror" in err_msg or "unable to locate credentials" in err_msg or "nocredentialserror" in err_msg:
+            report = _MOCK_REPORTS.get(report_id)
+            if report is not None:
+                report.analysis = analysis
+                report.priority_score = score
+                report.status = status
+                report.updated_at = datetime.now(timezone.utc)
+                _MOCK_REPORTS[report_id] = report
+                logger.info("dynamodb_service: fallback updated analysis in memory for '%s'", report_id)
+                return report
+        if isinstance(exc, ClientError) and exc.response.get("Error", {}).get("Code") == "ConditionalCheckFailedException":
             raise ReportNotFoundError(f"Report '{report_id}' does not exist") from exc
-        raise DynamoDBServiceError(
-            f"Failed to update analysis for report '{report_id}': {exc}"
-        ) from exc
-    except BotoCoreError as exc:
         raise DynamoDBServiceError(
             f"Failed to update analysis for report '{report_id}': {exc}"
         ) from exc
@@ -587,7 +604,14 @@ def list_reports(
         reports = [_attach_fresh_image_url(DustReport.from_dynamo_item(it)) for it in items[:limit]]
         reports.sort(key=lambda r: r.created_at, reverse=True)
         return reports
-    except (ClientError, BotoCoreError) as exc:
+    except Exception as exc:
+        err_msg = str(exc).lower()
+        if "could not connect" in err_msg or "endpointconnectionerror" in err_msg or "unable to locate credentials" in err_msg or "nocredentialserror" in err_msg:
+            results = list(_MOCK_REPORTS.values())
+            if status is not None:
+                results = [r for r in results if r.status == status]
+            results.sort(key=lambda r: r.created_at or datetime.min.replace(tzinfo=timezone.utc), reverse=True)
+            return results[:limit]
         raise DynamoDBServiceError(f"Failed to list reports: {exc}") from exc
 
 

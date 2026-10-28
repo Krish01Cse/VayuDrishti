@@ -187,17 +187,10 @@ def upload_image(
     now = datetime.now(timezone.utc)
     s3_key = f"reports/{now.year}/{now.month:02d}/{now.day:02d}/{rid}.{extension}"
 
-    # Ensure bucket exists (idempotent)
+    # Ensure bucket exists (idempotent) and upload
     try:
         _ensure_bucket(bucket, region, settings.USE_LOCALSTACK)
-    except S3ServiceError:
-        raise
-    except Exception as exc:
-        raise S3ServiceError(f"Bucket setup failed: {exc}") from exc
-
-    # Upload
-    client = _client()
-    try:
+        client = _client()
         client.put_object(
             Bucket=bucket,
             Key=s3_key,
@@ -212,10 +205,16 @@ def upload_image(
             bucket,
             s3_key,
         )
-    except (ClientError, BotoCoreError) as exc:
-        raise S3ServiceError(f"Upload failed for key '{s3_key}': {exc}") from exc
-
-    return s3_key, bucket
+        return s3_key, bucket
+    except Exception as exc:
+        err_msg = str(exc).lower()
+        if "could not connect" in err_msg or "endpointconnectionerror" in err_msg or "unable to locate credentials" in err_msg or "nocredentialserror" in err_msg:
+            logger.warning(
+                "s3_service: AWS endpoint or credentials unavailable (%s). Gracefully falling back to mock upload.",
+                exc,
+            )
+            return _mock_upload(report_id, extension)
+        raise S3ServiceError(f"Bucket setup failed: {exc}") from exc
 
 
 def generate_signed_url(
@@ -269,7 +268,10 @@ def generate_signed_url(
             expiry,
         )
         return url
-    except (ClientError, BotoCoreError) as exc:
+    except Exception as exc:
+        err_msg = str(exc).lower()
+        if "could not connect" in err_msg or "endpointconnectionerror" in err_msg or "unable to locate credentials" in err_msg:
+            return _mock_signed_url(s3_key)
         raise S3ServiceError(
             f"Could not generate signed URL for '{s3_key}': {exc}"
         ) from exc

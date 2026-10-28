@@ -19,6 +19,7 @@ import {
 import { Link } from 'react-router-dom';
 import { listReports, getReport } from '../services/api';
 import type { DustReportResponse } from '../types/report';
+import { useReportForm } from '../context/ReportFormContext';
 
 // --------------------------------------------------------------------------
 // Helpers
@@ -380,11 +381,12 @@ const DetailPanel: React.FC<{
 // --------------------------------------------------------------------------
 
 export const MyReportsPage: React.FC = () => {
+  const { selectedReportIdInList, setSelectedReportIdInList } = useReportForm();
+  const selectedId = selectedReportIdInList;
   const [reports, setReports] = useState<DustReportResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [detail, setDetail] = useState<DustReportResponse | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [detailError, setDetailError] = useState<string | null>(null);
@@ -411,10 +413,21 @@ export const MyReportsPage: React.FC = () => {
     fetchReports();
   }, [fetchReports]);
 
+  // Load detail for selected report (including restored selection)
+  useEffect(() => {
+    if (selectedReportIdInList && !detail) {
+      setLoadingDetail(true);
+      getReport(selectedReportIdInList)
+        .then((data) => setDetail(data))
+        .catch((err) => setDetailError(err instanceof Error ? err.message : 'Failed to load report detail.'))
+        .finally(() => setLoadingDetail(false));
+    }
+  }, [selectedReportIdInList]);
+
   // Fetch detail when a card is selected
   const handleSelectCard = async (id: string) => {
-    if (id === selectedId) return;
-    setSelectedId(id);
+    if (id === selectedReportIdInList) return;
+    setSelectedReportIdInList(id);
     setDetail(null);
     setDetailError(null);
     setLoadingDetail(true);

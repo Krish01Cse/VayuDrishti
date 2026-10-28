@@ -6,6 +6,7 @@ import { SubmitReportPage } from './pages/SubmitReportPage';
 import { MyReportsPage } from './pages/MyReportsPage';
 import { MapPage } from './pages/MapPage';
 import { NotFoundPage } from './pages/NotFoundPage';
+import { ReportFormProvider } from './context/ReportFormContext';
 
 // Scroll to top + page-transition animation on route change
 const PageTransition: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -31,23 +32,25 @@ const PageTransition: React.FC<{ children: React.ReactNode }> = ({ children }) =
 
 export const App: React.FC = () => {
   return (
-    <BrowserRouter>
-      <div className="app-container">
-        <Navbar />
-        <main className="main-content">
-          <PageTransition>
-            <Routes>
-              <Route path="/" element={<Navigate to="/submit" replace />} />
-              <Route path="/submit" element={<SubmitReportPage />} />
-              <Route path="/my-reports" element={<MyReportsPage />} />
-              <Route path="/map" element={<MapPage />} />
-              <Route path="*" element={<NotFoundPage />} />
-            </Routes>
-          </PageTransition>
-        </main>
-        <Footer />
-      </div>
-    </BrowserRouter>
+    <ReportFormProvider>
+      <BrowserRouter>
+        <div className="app-container">
+          <Navbar />
+          <main className="main-content">
+            <PageTransition>
+              <Routes>
+                <Route path="/" element={<Navigate to="/submit" replace />} />
+                <Route path="/submit" element={<SubmitReportPage />} />
+                <Route path="/my-reports" element={<MyReportsPage />} />
+                <Route path="/map" element={<MapPage />} />
+                <Route path="*" element={<NotFoundPage />} />
+              </Routes>
+            </PageTransition>
+          </main>
+          <Footer />
+        </div>
+      </BrowserRouter>
+    </ReportFormProvider>
   );
 };
 
