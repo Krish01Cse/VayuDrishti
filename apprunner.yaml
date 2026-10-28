@@ -1,0 +1,33 @@
+version: 1.0
+runtime: python311
+
+build:
+  commands:
+    build:
+      - pip install --upgrade pip
+      - pip install -r backend/requirements.txt
+
+run:
+  command: python -m uvicorn backend.main:app --host 0.0.0.0 --port 8000
+  network:
+    port: 8000
+    env: APP_PORT
+  env:
+    - name: AWS_REGION
+      value: ap-south-1
+    - name: STORAGE_PROVIDER
+      value: aws
+    - name: VISION_PROVIDER
+      value: bedrock
+    - name: S3_BUCKET_NAME
+      value: vayudrishti-images
+    - name: DYNAMODB_TABLE_DUST_REPORTS
+      value: DustReports
+    - name: DYNAMODB_TABLE_INCIDENT_CASES
+      value: IncidentCases
+    - name: DYNAMODB_TABLE_REVIEW_DECISIONS
+      value: ReviewDecisions
+    - name: DYNAMODB_TABLE_AUDIT_EVENTS
+      value: AuditEvents
+    - name: BEDROCK_MODEL_ID
+      value: anthropic.claude-3-haiku-20240307-v1:0
