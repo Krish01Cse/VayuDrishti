@@ -9,6 +9,11 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR/backend"
 
+# Activate virtualenv if present
+if [ -d "venv" ]; then
+    source venv/bin/activate
+fi
+
 # Determine python command
 if command -v python3 >/dev/null 2>&1; then
     PY_CMD="python3"
